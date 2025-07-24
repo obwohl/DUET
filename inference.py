@@ -130,7 +130,12 @@ def main():
     scaled_input_values = scaler.fit_transform(input_df.values)
 
     # 3. Initialize model and load checkpoint
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    if torch.cuda.is_available():
+        device = torch.device("cuda")
+    elif torch.backends.mps.is_available():
+        device = torch.device("mps")
+    else:
+        device = torch.device("cpu")
     model = DUETModel(config)
     print(f"Loading model checkpoint from {CHECKPOINT_PATH} to device '{device}'...")
     model.load_state_dict(torch.load(CHECKPOINT_PATH, map_location=device))
@@ -174,4 +179,3 @@ def main():
 
 if __name__ == '__main__':
     main()
-

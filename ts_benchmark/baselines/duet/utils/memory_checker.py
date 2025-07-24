@@ -43,12 +43,16 @@ def find_optimal_hardware_config(
         Ein Tupel (optimale_physische_batch_grösse, optimale_akkumulationsschritte).
         Gibt (None, None) zurück, wenn keine Konfiguration das Zeitlimit einhält.
     """
-    if not torch.backends.mps.is_available():
-        print("  [HW-Check] Not on MPS device. Skipping check. Using k=1.")
+    if torch.cuda.is_available():
+        device = torch.device("cuda")
+        print("  [HW-Check] CUDA device found. Starting hardware check.")
+    elif torch.backends.mps.is_available():
+        device = torch.device("mps")
+        print("  [HW-Check] MPS device found. Starting hardware check.")
+    else:
+        print("  [HW-Check] No CUDA or MPS device found. Skipping hardware check. Using k=1 (no accumulation).")
         # Gib die effektive Batch-Größe als physische Größe und k=1 zurück.
         return config_dict['batch_size'], 1
-
-    device = torch.device("mps")
     
     effective_batch_size = config_dict['batch_size']
 
@@ -124,7 +128,10 @@ def find_optimal_hardware_config(
                 break # Größere k-Werte werden ebenfalls fehlschlagen
             raise e
         finally:
-            torch.mps.empty_cache()
+            if torch.cuda.is_available():
+                torch.cuda.empty_cache()
+            elif torch.backends.mps.is_available():
+                torch.mps.empty_cache()
 
     if not performance_results:
         print("--- [HW-Check] ❌ FAILED. Keine Konfiguration konnte ausgeführt werden.")

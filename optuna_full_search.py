@@ -110,7 +110,12 @@ def run_full_hardness_check_and_prune(
     Bei einem OOM-Fehler wird der Trial direkt gepruned.
     """
     batch_size = model_hyper_params['batch_size']
-    device = torch.device("mps" if torch.backends.mps.is_available() else "cuda" if torch.cuda.is_available() else "cpu")
+    if torch.cuda.is_available():
+        device = torch.device("cuda")
+    elif torch.backends.mps.is_available():
+        device = torch.device("mps")
+    else:
+        device = torch.device("cpu")
     print(f"\n--- Full Hardness Check: Testing feasibility for batch_size = {batch_size} on {device} ---")
 
     # Konfiguration für den Mini-Benchmark
@@ -183,8 +188,8 @@ def run_full_hardness_check_and_prune(
             print(f"    -> {min(N_VALID_TEST_STEPS, len(valid_loader))} validation steps successful.")
         
         # Synchronisiere, um sicherzustellen, dass alle GPU-Operationen abgeschlossen sind
-        if torch.backends.mps.is_available(): torch.mps.synchronize()
-        elif torch.cuda.is_available(): torch.cuda.synchronize()
+        if torch.cuda.is_available(): torch.cuda.synchronize()
+        elif torch.backends.mps.is_available(): torch.mps.synchronize()
 
         # 6. Wenn alles gut geht, ist der Test bestanden
         print("    -> SUCCESS: Full hardness check passed. Configuration is feasible.")

@@ -173,7 +173,12 @@ def main():
     df_full.ffill().bfill(inplace=True)
 
     config = TransformerConfig(**config_dict)
-    device = torch.device("mps" if torch.backends.mps.is_available() else "cpu")
+    if torch.cuda.is_available():
+        device = torch.device("cuda")
+    elif torch.backends.mps.is_available():
+        device = torch.device("mps")
+    else:
+        device = torch.device("cpu")
     model = DUETProbModel(config)
     
     print(f"Loading checkpoint from: {CHECKPOINT_PATH}")
