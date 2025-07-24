@@ -26,36 +26,36 @@ def crps_loss(
                       wie `y_true` hat ([B, N_vars, H]). Der Loss für das Training ist
                       typischerweise `crps_values.mean()`.
     """
+    # --- START OF FIX: Memory-Efficient CRPS Calculation ---
+    # The original vectorized version creates a massive intermediate tensor
+    # of shape [B, H, N_vars, Q], causing OOM errors with large batches.
+    # This version iterates over quantiles, trading a bit of speed for
+    # a massive reduction in memory usage.
+
+    # 1. Forme y_true für die Schleife vor
+    # y_true ist [B, N_vars, H]. Wir brauchen [B, H, N_vars] für die Subtraktion.
+    y_true_compatible = y_true.permute(0, 2, 1)
     
-    # 1. Erzeuge die Quantil-Niveaus
-    quantiles = torch.linspace(
-        start=0.5 / num_quantiles,
-        end=1.0 - 0.5 / num_quantiles,
-        steps=num_quantiles,
-        device=y_true.device,
-    )
+    total_pinball_loss = torch.zeros_like(y_true_compatible)
 
-    # 2. Berechne die vorhergesagten Werte für jedes Quantil-Niveau
-    # distr.icdf gibt [B, H, N_vars, Q] zurück
-    y_pred_quantiles = distr.icdf(quantiles)
+    # 2. Schleife über die Quantile
+    for i in range(num_quantiles):
+        q = (i + 0.5) / num_quantiles
+        q_tensor = torch.tensor(q, device=y_true.device)
 
-    # 3. Forme y_true für das Broadcasting vor
-    # y_true ist [B, N_vars, H]. Wir brauchen [B, H, N_vars, 1] für die Subtraktion.
-    y_true_compatible = y_true.permute(0, 2, 1).unsqueeze(-1)
+        # Berechne die Vorhersage für dieses EINE Quantil
+        # distr.icdf gibt [B, H, N_vars] zurück
+        y_pred_q = distr.icdf(q_tensor)
 
-    # 4. Berechne den Pinball Loss für alle Punkte und Quantile gleichzeitig
-    error = y_pred_quantiles - y_true_compatible
-    
-    # quantiles ist 1D [Q], wir brauchen [1, 1, 1, Q] für Broadcasting
-    quantiles_bcast = quantiles.view(1, 1, 1, -1)
+        # Berechne den Pinball Loss für dieses Quantil
+        error = y_pred_q - y_true_compatible
+        pinball_loss = torch.max((q_tensor) * error, (q_tensor - 1.0) * error)
+        total_pinball_loss += pinball_loss
 
-    loss_term1 = quantiles_bcast * error
-    loss_term2 = (1.0 - quantiles_bcast) * error
-    pinball_loss_per_quantile = torch.max(loss_term1, -loss_term2)
-
-    # 5. Approximiere den CRPS durch den Durchschnitt des Pinball Loss
+    # 3. Approximiere den CRPS durch den Durchschnitt des Pinball Loss
     # Das Ergebnis ist [B, H, N_vars]
-    crps = 2 * pinball_loss_per_quantile.mean(dim=-1)
-    
+    crps = 2 * total_pinball_loss / num_quantiles
+
     # Gib den Loss in der gleichen Form wie y_true zurück: [B, N_vars, H]
     return crps.permute(0, 2, 1)
+    # --- END OF FIX ---
