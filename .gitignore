@@ -1,0 +1,25 @@
+dataset/
+result/
+.idea/
+.vscode/
+.git
+*.DS_Store
+venv/
+
+# Python cache
+__pycache__/
+*.pyc
+*.pkl
+*.pt
+*.0
+*log.txt
+
+# Autogluon
+*.ubj
+version.txt
+metadata.json
+
+#optuna
+*study.db
+
+inference_checkpoints/
