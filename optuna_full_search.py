@@ -15,6 +15,8 @@ import pandas as pd
 # Direkter Import der notwendigen Klassen
 from ts_benchmark.baselines.duet.duet_prob import DUETProb
 from ts_benchmark.data.data_source import LocalForecastingDataSource
+# --- NEU: Importiere die Loss-Funktion für den Hardness Check ---
+from ts_benchmark.baselines.duet.utils.crps import crps_loss
 from ts_benchmark.baselines.utils import forecasting_data_provider, train_val_split
 
 
@@ -66,7 +68,7 @@ def get_suggested_params(trial: optuna.Trial) -> dict:
     params["fc_dropout"] = trial.suggest_float("fc_dropout", 0.0, 0.5)
     
     # Optuna schlägt die exakte Batch-Größe vor, die verwendet werden soll.
-    params["batch_size"] = trial.suggest_categorical("batch_size", [2048, 4096, 8192])  
+    params["batch_size"] = trial.suggest_categorical("batch_size", [64, 128, 256, 512, 1024])  
 
     params["loss_coef"] = trial.suggest_float("loss_coef", 0.1, 2.0, log=True)
     params["num_linear_experts"] = trial.suggest_int("num_linear_experts", 0, 8)
@@ -171,10 +173,24 @@ def run_full_hardness_check_and_prune(
         for i in range(min(N_TRAIN_TEST_STEPS, len(train_loader))):
             input_data, _, _, _ = next(train_loader_iter)
             input_data = input_data.to(device)
+            
+            # --- VOLLSTÄNDIGER LOSS-CHECK ---
+            # Simuliere die exakte Loss-Berechnung aus dem Trainingslauf
             optimizer.zero_grad()
-            _, _, loss, _, _, _, _, _ = model.model(input_data)
-            loss.backward()
+            denorm_distr, base_distr, loss_importance, _, _, _, _, _ = model.model(input_data)
+            
+            # Erstelle ein Dummy-Ziel für die CRPS-Berechnung
+            dummy_target = torch.randn(
+                batch_size, model.config.horizon, model.config.enc_in, device=device
+            )
+            norm_target = denorm_distr.normalize_value(dummy_target).permute(0, 2, 1)
+            
+            # Berechne den vollständigen Loss
+            normalized_crps_loss = crps_loss(base_distr, norm_target).mean()
+            total_loss = normalized_crps_loss + model.config.loss_coef * loss_importance
+            total_loss.backward()
             optimizer.step()
+            
         print(f"    -> {min(N_TRAIN_TEST_STEPS, len(train_loader))} training steps successful.")
 
         # 5. **VOLLE HÄRTE**: Simuliere Validierungsschritte (ohne Gradienten)
@@ -284,7 +300,7 @@ if __name__ == "__main__":
             "n_heads": 1,
             "dropout": 0.1,
             "fc_dropout": 0.1,
-            "batch_size": 8192,
+            "batch_size": 512,
             "loss_coef": 0.9,
             "num_linear_experts": 3,
             "num_esn_experts": 3,
