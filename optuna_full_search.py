@@ -66,7 +66,7 @@ def get_suggested_params(trial: optuna.Trial) -> dict:
     params["fc_dropout"] = trial.suggest_float("fc_dropout", 0.0, 0.5)
     
     # Optuna schlägt die exakte Batch-Größe vor, die verwendet werden soll.
-    params["batch_size"] = trial.suggest_categorical("batch_size", [64, 128, 256, 512])
+    params["batch_size"] = trial.suggest_categorical("batch_size", [2048, 4096, 8192])  
 
     params["loss_coef"] = trial.suggest_float("loss_coef", 0.1, 2.0, log=True)
     params["num_linear_experts"] = trial.suggest_int("num_linear_experts", 0, 8)
@@ -279,7 +279,7 @@ if __name__ == "__main__":
             "n_heads": 1,
             "dropout": 0.1,
             "fc_dropout": 0.1,
-            "batch_size": 512,
+            "batch_size": 8192,
             "loss_coef": 0.9,
             "num_linear_experts": 3,
             "num_esn_experts": 3,
