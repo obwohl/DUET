@@ -305,8 +305,9 @@ class DUETProb(ModelBase):
         train_data, valid_data = train_val_split(train_valid_data, train_ratio_in_tv, config.seq_len)
         
         # === NEU: Einmalige Suche nach interessanten Fenstern für die Plots ===
-        if valid_data is not None and not valid_data.empty:
-            self._find_interesting_windows(valid_data)
+        # --- DEAKTIVIERT: Die Suche nach interessanten Fenstern ist rechenintensiv und wird hier abgeschaltet. ---
+        # if valid_data is not None and not valid_data.empty:
+        #     self._find_interesting_windows(valid_data)
 
         print("\n--- Preparing data for training... ---")
         # Der Daten-Provider erwartet timeenc=1 oder 2. Wir verwenden 1.
