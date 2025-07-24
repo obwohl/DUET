@@ -1,15 +1,13 @@
 import numpy as np
-import numba
 from scipy.stats import ks_2samp
 import pandas as pd
 from tqdm import tqdm
 
 
-@numba.jit(nopython=True)
 def _calculate_slope(y: np.ndarray) -> float:
     """
     Berechnet die Steigung einer einfachen linearen Regression (y = mx + b)
-    für eine gegebene Zeitreihe y. Numba-optimiert.
+    für eine gegebene Zeitreihe y.
     """
     n = len(y)
     if n < 2:
@@ -99,27 +97,26 @@ def find_interesting_windows(
         results[i]['max_mean_diff_idx'] = np.argmax(mean_diffs[:, i]) + search_offset
         results[i]['max_var_diff_idx'] = np.argmax(var_diffs[:, i]) + search_offset
 
-    # --- 2. Trendumkehr & KS-Distanz (mit Numba-optimierten Schleifen) ---
+
     num_windows = shape[0]
 
     # Initialisiere Arrays für die Ergebnisse
     trend_diffs = np.zeros((num_windows, num_channels))
     ks_dists = np.zeros((num_windows, num_channels))
 
-    @numba.jit(nopython=True, parallel=True)
     def calculate_trend_diffs(wb, wa, out_arr):
-        for i in numba.prange(num_windows):
+        for i in range(num_windows):
             for j in range(num_channels):
                 slope_before = _calculate_slope(wb[i, :, j])
                 slope_after = _calculate_slope(wa[i, :, j])
                 out_arr[i, j] = np.abs(slope_after - slope_before)
 
-    print(" -> Analyzing windows for trend reversals (Numba)...")
+    print(" -> Analyzing windows for trend reversals...")
     calculate_trend_diffs(windows_before, windows_after, trend_diffs)
 
-    # Die KS-Distanz verwendet Scipy und kann nicht direkt in Numba nopython=True
-    # ausgeführt werden. Eine reine Python-Schleife ist hier immer noch schnell genug,
-    # da sie nur einmal pro Trainingslauf ausgeführt wird.
+
+
+
     for i in tqdm(range(num_windows), desc=" -> Analyzing windows for distribution shifts (KS-test)", leave=False):
         for j in range(num_channels):
             # ks_2samp gibt (statistik, p-wert) zurück. Wir brauchen nur die Statistik.
