@@ -32,8 +32,8 @@ FIXED_PARAMS = {
     "patience": 5,        
     "quantiles": [0.01, 0.05, 0.25, 0.5, 0.75, 0.95, 0.99],
     "lradj": "constant",
-    "min_training_time": , 
-    "max_training_time": 10800,
+    "min_training_time": 600, 
+    "max_training_time": 5400,
     "channel_adjacency_prior": [
         [1, 1, 0, 0, 0, 0],  
         [1, 1, 0, 0, 0, 0],
